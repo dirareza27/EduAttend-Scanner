@@ -41,7 +41,7 @@ window.addEventListener('message',event=>{
     if(event.origin==='null') return;
     parentOrigin=event.origin;connected=true;
     say('Terhubung ke EduAttend. Menyalakan kamera...');
-    startCamera().then(()=>sendToParent({type:'EDUATTEND_SCANNER_CONNECTED',version:1}));
+    startCamera().then(ok=>{if(ok)sendToParent({type:'EDUATTEND_SCANNER_CONNECTED',version:1});});
   }else if(event.data && event.data.type==='EDUATTEND_SCAN_RESULT'){
     const result=event.data.result||{};
     say(result.success ? (result.duplicate?'Sudah tercatat: ':'Berhasil: ')+(result.message||'') : (result.message||'Scan gagal.'));
@@ -59,8 +59,8 @@ if(e?.name==='NotReadableError'||e?.name==='TrackStartError')return'Kamera sedan
 return e?.message||'Kamera gagal dibuka. Pastikan halaman menggunakan HTTPS.';
 };
 async function startCamera(){
-if(running)return;
-if(!window.Html5Qrcode){say('Library scanner belum termuat. Periksa koneksi internet.');return;}
+if(running)return true;
+if(!window.Html5Qrcode){say('Library scanner belum termuat. Periksa koneksi internet.');return false;}
 start.disabled=true;say('Meminta izin kamera...');
 try{
 scanner=new Html5Qrcode('reader');
@@ -69,8 +69,8 @@ if(!cameras.length)throw new Error('Kamera tidak ditemukan.');
 const back=cameras.find(c=>/back|rear|environment|belakang/i.test(c.label))||cameras[cameras.length-1];
 await scanner.start(back.id,{fps:10,qrbox:{width:230,height:230},aspectRatio:1},
 decoded=>{if(handling)return;handling=true;if(!connected){say('Scanner belum terhubung ke EduAttend. Tutup dan buka kembali dari menu absensi.');handling=false;return;}say('QR terbaca. Mengirim ke EduAttend...');sendToParent({type:'EDUATTEND_QR_SCANNED',version:1,payload:decoded});},()=>{});
-running=true;stop.disabled=false;say('Kamera aktif. Arahkan QR ke kotak pemindai.');
-}catch(e){say(explain(e));try{if(scanner)await scanner.clear()}catch(_){}scanner=null;start.disabled=false;}
+running=true;stop.disabled=false;say('Kamera aktif. Arahkan QR ke kotak pemindai.');return true;
+}catch(e){say(explain(e));try{if(scanner)await scanner.clear()}catch(_){}scanner=null;start.disabled=false;return false;}
 }
 async function stopCamera(){if(scanner&&running){try{await scanner.stop();await scanner.clear()}catch(_){}}scanner=null;running=false;start.disabled=false;stop.disabled=true;say('Kamera dimatikan.')}
 start.addEventListener('click',startCamera);stop.addEventListener('click',stopCamera);
