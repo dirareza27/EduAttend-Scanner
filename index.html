@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#123b67">
+<title>EduAttend QR Scanner</title>
+<style>
+:root{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#172033;background:#f3f6fa}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;padding:16px}
+main{max-width:520px;margin:0 auto;background:#fff;border:1px solid #e1e7ef;border-radius:18px;padding:20px;box-shadow:0 8px 28px #142b4612}
+h1{font-size:22px;margin:0 0 6px;color:#123b67}p{color:#536174;line-height:1.5;margin:6px 0 16px}
+#reader{width:100%;min-height:240px;overflow:hidden;border-radius:14px;background:#101827}
+.actions{display:flex;gap:10px;margin-top:14px}.actions button{flex:1;border:0;border-radius:10px;padding:13px;font-size:15px;font-weight:650}
+#start{background:#145da0;color:white}#stop{background:#e9eef4;color:#243449}
+button:disabled{opacity:.5}#status{margin-top:14px;padding:12px;border-radius:10px;background:#eef4fb;color:#23486e;font-size:14px;overflow-wrap:anywhere}
+.hint{font-size:12px;color:#6b7788;margin-top:14px}
+</style>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+</head>
+<body>
+<main>
+<h1>EduAttend – Pemindai QR</h1>
+<p>Uji kamera melalui halaman HTTPS terpisah. Gunakan Chrome HP dan izinkan akses kamera.</p>
+<div id="reader"></div>
+<div class="actions"><button id="start" type="button">Mulai Kamera</button><button id="stop" type="button" disabled>Matikan</button></div>
+<div id="status" role="status" aria-live="polite">Kamera belum dijalankan.</div>
+<div class="hint">Mode uji kamera. Belum mengirim hasil scan ke absensi EduAttend.</div>
+</main>
+<script>
+(()=> {
+const status=document.getElementById('status'),start=document.getElementById('start'),stop=document.getElementById('stop');
+let scanner=null,running=false,handling=false;
+const say=t=>status.textContent=t;
+const explain=e=>{
+if(e?.name==='NotAllowedError'||e?.name==='PermissionDeniedError')return'Izin kamera ditolak. Periksa izin Kamera untuk github.io pada pengaturan situs Chrome.';
+if(e?.name==='NotFoundError'||e?.name==='DevicesNotFoundError')return'Kamera tidak ditemukan.';
+if(e?.name==='NotReadableError'||e?.name==='TrackStartError')return'Kamera sedang digunakan aplikasi lain. Tutup aplikasi lain lalu coba lagi.';
+return e?.message||'Kamera gagal dibuka. Pastikan halaman menggunakan HTTPS.';
+};
+async function startCamera(){
+if(running)return;
+if(!window.Html5Qrcode){say('Library scanner belum termuat. Periksa koneksi internet.');return;}
+start.disabled=true;say('Meminta izin kamera...');
+try{
+scanner=new Html5Qrcode('reader');
+const cameras=await Html5Qrcode.getCameras();
+if(!cameras.length)throw new Error('Kamera tidak ditemukan.');
+const back=cameras.find(c=>/back|rear|environment|belakang/i.test(c.label))||cameras[cameras.length-1];
+await scanner.start(back.id,{fps:10,qrbox:{width:230,height:230},aspectRatio:1},
+decoded=>{if(handling)return;handling=true;say('QR terbaca. Uji kamera berhasil. Isi QR: '+decoded);setTimeout(()=>handling=false,900);},()=>{});
+running=true;stop.disabled=false;say('Kamera aktif. Arahkan QR ke kotak pemindai.');
+}catch(e){say(explain(e));try{if(scanner)await scanner.clear()}catch(_){}scanner=null;start.disabled=false;}
+}
+async function stopCamera(){if(scanner&&running){try{await scanner.stop();await scanner.clear()}catch(_){}}scanner=null;running=false;start.disabled=false;stop.disabled=true;say('Kamera dimatikan.')}
+start.addEventListener('click',startCamera);stop.addEventListener('click',stopCamera);
+window.addEventListener('pagehide',()=>{if(scanner&&running)scanner.stop().catch(()=>{});});
+})();
+</script>
+</body></html>
