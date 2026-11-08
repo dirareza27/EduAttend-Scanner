@@ -25,7 +25,7 @@ button:disabled{opacity:.5}#status{margin-top:14px;padding:12px;border-radius:10
 <div id="reader"></div>
 <div class="actions"><button id="start" type="button">Mulai Kamera</button><button id="stop" type="button" disabled>Matikan</button></div>
 <div id="status" role="status" aria-live="polite">Kamera belum dijalankan.</div>
-<div class="hint">Hasil scan dikirim ke aplikasi EduAttend untuk divalidasi dan disimpan.</div>
+<div class="hint">Mode uji mandiri: QR hanya dibaca kamera, tidak dikirim dan tidak mengubah data absensi.</div>
 </main>
 <script>
 (()=> {
@@ -68,7 +68,7 @@ const cameras=await Html5Qrcode.getCameras();
 if(!cameras.length)throw new Error('Kamera tidak ditemukan.');
 const back=cameras.find(c=>/back|rear|environment|belakang/i.test(c.label))||cameras[cameras.length-1];
 await scanner.start(back.id,{fps:10,qrbox:{width:230,height:230},aspectRatio:1},
-decoded=>{if(handling)return;handling=true;if(!connected){say('Scanner belum terhubung ke EduAttend. Tutup dan buka kembali dari menu absensi.');handling=false;return;}say('QR terbaca. Mengirim ke EduAttend...');sendToParent({type:'EDUATTEND_QR_SCANNED',version:1,payload:decoded});},()=>{});
+decoded=>{if(handling)return;handling=true;if(!connected){say('UJI BACA BERHASIL. QR terdeteksi, tetapi tidak dikirim dan tidak mengubah absensi.');setTimeout(()=>handling=false,1800);return;}say('QR terbaca. Mengirim ke EduAttend...');sendToParent({type:'EDUATTEND_QR_SCANNED',version:1,payload:decoded});},()=>{});
 running=true;stop.disabled=false;say('Kamera aktif. Arahkan QR ke kotak pemindai.');return true;
 }catch(e){say(explain(e));try{if(scanner)await scanner.clear()}catch(_){}scanner=null;start.disabled=false;return false;}
 }
