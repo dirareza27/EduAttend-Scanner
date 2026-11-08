@@ -40,8 +40,8 @@ window.addEventListener('message',event=>{
   if(event.data && event.data.type==='EDUATTEND_CONNECT'){
     if(event.origin==='null') return;
     parentOrigin=event.origin;connected=true;
-    sendToParent({type:'EDUATTEND_SCANNER_CONNECTED',version:1});
-    say('Terhubung ke EduAttend. Siap memindai kartu murid.');
+    say('Terhubung ke EduAttend. Menyalakan kamera...');
+    startCamera().then(()=>sendToParent({type:'EDUATTEND_SCANNER_CONNECTED',version:1}));
   }else if(event.data && event.data.type==='EDUATTEND_SCAN_RESULT'){
     const result=event.data.result||{};
     say(result.success ? (result.duplicate?'Sudah tercatat: ':'Berhasil: ')+(result.message||'') : (result.message||'Scan gagal.'));
