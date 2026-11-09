@@ -1,5 +1,201 @@
 <!doctype html>
-<html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#123b67"><title>EduAttend QR Scanner</title>
-<style>:root{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#172033;background:#f3f6fa}*{box-sizing:border-box}body{margin:0;min-height:100vh;padding:16px}main{max-width:520px;margin:0 auto;background:#fff;border:1px solid #e1e7ef;border-radius:18px;padding:20px;box-shadow:0 8px 28px #142b4612}h1{font-size:22px;margin:0 0 6px;color:#123b67}p{color:#536174;line-height:1.5;margin:6px 0 16px}#reader{width:100%;min-height:280px;overflow:hidden;border-radius:14px;background:#101827}.actions{display:flex;gap:10px;margin-top:14px}.actions button{flex:1;border:0;border-radius:10px;padding:13px;font-size:15px;font-weight:650}#start{background:#145da0;color:white}#stop{background:#e9eef4;color:#243449}button:disabled{opacity:.5}#status{margin-top:14px;padding:12px;border-radius:10px;background:#eef4fb;color:#23486e;font-size:14px;overflow-wrap:anywhere}.hint{font-size:12px;color:#6b7788;margin-top:14px}</style>
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script></head><body><main><h1>EduAttend – Pemindai QR</h1><p>Pemindai kamera eksternal EduAttend. Buka halaman ini dari tombol Scan QR di aplikasi EduAttend.</p><div id="reader"></div><div class="actions"><button id="start" type="button">Mulai Kamera</button><button id="stop" type="button" disabled>Matikan</button></div><div id="status" role="status" aria-live="polite">Kamera belum dijalankan.</div><div class="hint">Mode uji mandiri: QR hanya dibaca kamera, tidak dikirim dan tidak mengubah data absensi.</div></main>
-<script>(()=>{const status=document.getElementById('status'),start=document.getElementById('start'),stop=document.getElementById('stop');let scanner=null,running=false,handling=false,parentOrigin='',connected=false;function sendToParent(payload){if(window.opener&&parentOrigin)window.opener.postMessage(payload,parentOrigin)}window.addEventListener('message',event=>{if(event.source!==window.opener||!window.opener)return;if(event.data&&event.data.type==='EDUATTEND_CONNECT'){if(event.origin==='null')return;parentOrigin=event.origin;connected=true;say('Terhubung ke EduAttend. Menyalakan kamera...');startCamera().then(ok=>{if(ok)sendToParent({type:'EDUATTEND_SCANNER_CONNECTED',version:1})})}else if(event.data&&event.data.type==='EDUATTEND_SCAN_RESULT'){const result=event.data.result||{};say(result.success?(result.duplicate?'Sudah tercatat: ':'Berhasil: ')+(result.message||''):(result.message||'Scan gagal.'));handling=false}else if(event.data&&event.data.type==='EDUATTEND_CLOSE'){stopCamera()}});if(window.opener)window.opener.postMessage({type:'EDUATTEND_SCANNER_READY',version:1},'*');const say=t=>status.textContent=t;const explain=e=>{if(e?.name==='NotAllowedError'||e?.name==='PermissionDeniedError')return'Izin kamera ditolak. Periksa izin Kamera untuk github.io pada pengaturan situs Chrome.';if(e?.name==='NotFoundError'||e?.name==='DevicesNotFoundError')return'Kamera tidak ditemukan.';if(e?.name==='NotReadableError'||e?.name==='TrackStartError')return'Kamera sedang digunakan aplikasi lain. Tutup aplikasi lain lalu coba lagi.';return e?.message||'Kamera gagal dibuka. Pastikan halaman menggunakan HTTPS.'};async function startCamera(){if(running)return true;if(!window.Html5Qrcode){say('Library scanner belum termuat. Periksa koneksi internet.');return false}start.disabled=true;say('Meminta izin kamera...');try{scanner=new Html5Qrcode('reader',{formatsToSupport:[Html5QrcodeSupportedFormats.QR_CODE],verbose:false});const cameras=await Html5Qrcode.getCameras();if(!cameras.length)throw new Error('Kamera tidak ditemukan.');const back=cameras.find(c=>/back|rear|environment|belakang/i.test(c.label))||cameras[cameras.length-1];const config={fps:12,qrbox:(viewfinderWidth,viewfinderHeight)=>{const size=Math.floor(Math.min(viewfinderWidth,viewfinderHeight)*0.88);return{width:size,height:size}},videoConstraints:{deviceId:{exact:back.id},width:{ideal:1920},height:{ideal:1080}},disableFlip:false};await scanner.start(back.id,config,decoded=>{if(handling)return;handling=true;if(!connected){say('UJI BACA BERHASIL. QR terdeteksi, tetapi tidak dikirim dan tidak mengubah absensi.');setTimeout(()=>handling=false,1200);return}say('QR terbaca. Mengirim ke EduAttend...');sendToParent({type:'EDUATTEND_QR_SCANNED',version:1,payload:decoded})},()=>{});running=true;stop.disabled=false;say('Kamera aktif. Arahkan seluruh QR ke kotak pemindai.');return true}catch(e){say(explain(e));try{if(scanner)await scanner.clear()}catch(_){}scanner=null;start.disabled=false;return false}}async function stopCamera(){if(scanner&&running){try{await scanner.stop();await scanner.clear()}catch(_){}}scanner=null;running=false;start.disabled=false;stop.disabled=true;say('Kamera dimatikan.')}start.addEventListener('click',startCamera);stop.addEventListener('click',stopCamera);window.addEventListener('pagehide',()=>{if(scanner&&running)scanner.stop().catch(()=>{})})})();</script></body></html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#123b67">
+<title>EduAttend QR Scanner</title>
+<style>
+:root{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#172033;background:#f3f6fa}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;padding:16px}
+main{max-width:520px;margin:0 auto;background:#fff;border:1px solid #e1e7ef;border-radius:18px;padding:20px;box-shadow:0 8px 28px #142b4612}
+h1{font-size:22px;margin:0 0 6px;color:#123b67}
+p{color:#536174;line-height:1.5;margin:6px 0 16px}
+#reader{width:100%;min-height:280px;overflow:hidden;border-radius:14px;background:#101827}
+.actions{display:flex;gap:10px;margin-top:14px}
+.actions button{flex:1;border:0;border-radius:10px;padding:13px;font-size:15px;font-weight:650}
+#start{background:#145da0;color:#fff}
+#stop{background:#e9eef4;color:#243449}
+button:disabled{opacity:.5}
+#status{margin-top:14px;padding:12px;border-radius:10px;background:#eef4fb;color:#23486e;font-size:14px;overflow-wrap:anywhere}
+.hint{font-size:12px;color:#6b7788;margin-top:14px}
+</style>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+</head>
+<body>
+<main>
+<h1>EduAttend – Pemindai QR</h1>
+<p>Pemindai kamera EduAttend. Buka halaman ini melalui tombol Mulai Scan QR di aplikasi utama.</p>
+<div id="reader"></div>
+<div class="actions">
+<button id="start" type="button">Mulai Kamera</button>
+<button id="stop" type="button" disabled>Matikan</button>
+</div>
+<div id="status" role="status" aria-live="polite">Kamera belum dijalankan.</div>
+<div id="hint" class="hint">Jika dibuka langsung, halaman hanya menguji pembacaan QR dan tidak mengubah data absensi.</div>
+</main>
+<script>
+(()=>{
+'use strict';
+const status=document.getElementById('status');
+const start=document.getElementById('start');
+const stop=document.getElementById('stop');
+const hint=document.getElementById('hint');
+let scanner=null;
+let running=false;
+let handling=false;
+let parentOrigin='';
+let connected=false;
+let pendingScanId='';
+let scanAckTimer=null;
+let lastPayload='';
+let lastPayloadAt=0;
+let scanSequence=0;
+
+const say=text=>{status.textContent=text;};
+function makeScanId(){
+  if(window.crypto&&typeof window.crypto.randomUUID==='function')return window.crypto.randomUUID();
+  scanSequence++;
+  return 'EA-'+Date.now()+'-'+scanSequence+'-'+Math.random().toString(36).slice(2,10);
+}
+function sendToParent(payload){
+  if(!window.opener||!parentOrigin)return false;
+  try{window.opener.postMessage(payload,parentOrigin);return true;}
+  catch(error){return false;}
+}
+function clearPending(){
+  if(scanAckTimer){window.clearTimeout(scanAckTimer);scanAckTimer=null;}
+  pendingScanId='';
+  handling=false;
+}
+window.addEventListener('message',event=>{
+  if(!window.opener||event.source!==window.opener)return;
+  const data=event.data||{};
+  if(data.type==='EDUATTEND_CONNECT'){
+    if(event.origin==='null')return;
+    parentOrigin=event.origin;
+    connected=true;
+    hint.textContent='Terhubung ke EduAttend. Hasil QR akan divalidasi dan disimpan oleh aplikasi utama.';
+    say('Terhubung ke EduAttend. Menyalakan kamera...');
+    startCamera().then(ok=>{
+      if(ok)sendToParent({type:'EDUATTEND_SCANNER_CONNECTED',version:1});
+    });
+    return;
+  }
+  if(parentOrigin&&event.origin!==parentOrigin)return;
+  if(data.type==='EDUATTEND_SCAN_RESULT'){
+    if(!pendingScanId)return;
+    if(data.scanId&&data.scanId!==pendingScanId)return;
+    const result=data.result||{};
+    clearPending();
+    if(result.success){
+      say((result.duplicate?'Sudah tercatat: ':'Berhasil: ')+(result.message||'Scan dikonfirmasi EduAttend.'));
+    }else{
+      say(result.message||'Scan belum berhasil diproses. Silakan coba kembali.');
+    }
+    return;
+  }
+  if(data.type==='EDUATTEND_CLOSE')stopCamera();
+});
+if(window.opener){
+  try{window.opener.postMessage({type:'EDUATTEND_SCANNER_READY',version:1},'*');}catch(error){}
+}
+const explain=error=>{
+  if(error&&(['NotAllowedError','PermissionDeniedError'].includes(error.name)))return'Izin kamera ditolak. Periksa izin Kamera untuk github.io pada pengaturan situs Chrome.';
+  if(error&&(['NotFoundError','DevicesNotFoundError'].includes(error.name)))return'Kamera tidak ditemukan.';
+  if(error&&(['NotReadableError','TrackStartError'].includes(error.name)))return'Kamera sedang digunakan aplikasi lain. Tutup aplikasi lain lalu coba lagi.';
+  return(error&&error.message)||'Kamera gagal dibuka. Pastikan halaman menggunakan HTTPS.';
+};
+async function startCamera(){
+  if(running)return true;
+  if(!window.Html5Qrcode){say('Library scanner belum termuat. Periksa koneksi internet.');return false;}
+  start.disabled=true;
+  say('Meminta izin kamera...');
+  try{
+    scanner=new Html5Qrcode('reader',{
+      formatsToSupport:[Html5QrcodeSupportedFormats.QR_CODE],
+      verbose:false
+    });
+    const cameras=await Html5Qrcode.getCameras();
+    if(!cameras.length)throw new Error('Kamera tidak ditemukan.');
+    const back=cameras.find(camera=>/back|rear|environment|belakang/i.test(camera.label))||cameras[cameras.length-1];
+    const config={
+      fps:12,
+      qrbox:(viewfinderWidth,viewfinderHeight)=>{
+        const size=Math.floor(Math.min(viewfinderWidth,viewfinderHeight)*0.88);
+        return{width:size,height:size};
+      },
+      videoConstraints:{
+        deviceId:{exact:back.id},
+        width:{ideal:1920},
+        height:{ideal:1080}
+      },
+      disableFlip:false
+    };
+    await scanner.start(back.id,config,decoded=>{
+      if(handling)return;
+      const now=Date.now();
+      if(decoded===lastPayload&&now-lastPayloadAt<1800)return;
+      lastPayload=decoded;
+      lastPayloadAt=now;
+      if(!connected){
+        handling=true;
+        say('UJI BACA BERHASIL. QR terdeteksi; tidak dikirim dan tidak mengubah absensi.');
+        window.setTimeout(()=>{handling=false;},1200);
+        return;
+      }
+      const scanId=makeScanId();
+      pendingScanId=scanId;
+      handling=true;
+      say('QR terbaca. Mengirim ke EduAttend...');
+      const sent=sendToParent({
+        type:'EDUATTEND_QR_SCANNED',
+        version:1,
+        scanId:scanId,
+        payload:decoded
+      });
+      if(!sent){
+        clearPending();
+        say('Koneksi ke EduAttend terputus. Tutup scanner dan buka kembali dari aplikasi.');
+        return;
+      }
+      scanAckTimer=window.setTimeout(()=>{
+        if(pendingScanId!==scanId)return;
+        clearPending();
+        say('Belum ada konfirmasi dari EduAttend setelah 20 detik. Periksa status absensi sebelum memindai ulang.');
+      },20000);
+    },()=>{});
+    running=true;
+    stop.disabled=false;
+    say(connected?'Kamera aktif. Arahkan QR murid berikutnya ke kotak pemindai.':'Kamera aktif dalam mode uji baca mandiri.');
+    return true;
+  }catch(error){
+    say(explain(error));
+    try{if(scanner)await scanner.clear();}catch(clearError){}
+    scanner=null;
+    start.disabled=false;
+    return false;
+  }
+}
+async function stopCamera(){
+  clearPending();
+  if(scanner&&running){
+    try{await scanner.stop();await scanner.clear();}catch(error){}
+  }
+  scanner=null;
+  running=false;
+  start.disabled=false;
+  stop.disabled=true;
+  say('Kamera dimatikan.');
+}
+start.addEventListener('click',startCamera);
+stop.addEventListener('click',stopCamera);
+window.addEventListener('pagehide',()=>{
+  clearPending();
+  if(scanner&&running)scanner.stop().catch(()=>{});
+});
+})();
+</script>
+</body>
+</html>
